@@ -49,8 +49,9 @@ tg_bot = telebot.TeleBot(tg_token)
 
 @ds_bot.event
 async def on_ready():
+    global pid
     pid = os.getpid()
-    readytext = f"Бот запущен под PID: {pid}, что бы его остановить пропишите kill {pid} в терминал сервера"
+    readytext = f"Бот запущен под PID: {pid}, что бы его остановить пропишите kill {pid} в терминал сервера или мне в ЛС"
     ds_bot.send_message(ds_owner_chat_id, readytext)
 
 
@@ -72,13 +73,13 @@ async def try_delete_file(filename):
 # Пересылание сообщений из Discord в Telegram
 @ds_bot.event
 async def on_message(message):
-    if message.channel.id == ds_channel_id:
-        if message.author.id != ds_bot.user.id:
+    if message.author.id != ds_bot.user.id:
+        if message.channel.id == ds_channel_id:
             try:
                 text = f"*{message.author.display_name}*\n{message.content}"
 
                 # Экранируем сообщения
-                escaped_characters = "()=.->"
+                escaped_characters = "#!()=.->"
                 for item in escaped_characters:
                     text = text.replace(f"{item}", f"\{item}")
 
@@ -101,6 +102,10 @@ async def on_message(message):
                 errortext += f"ID Сообщения: {message.id} от {errdate}"
                 ds_bot.send_message(ds_owner_chat_id, errortext)
                 raise e
+        elif message.channel.id == ds_owner_chat_id:
+            if message.content == f"kill {pid}":
+                tg_bot.stop_bot()
+                await ds_bot.close()
 
 
 # Пересылание сообщений из Telegram в Discord
