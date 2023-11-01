@@ -26,8 +26,8 @@ class MyDiscordClient(discord.Client):
     async def on_ready(self):
         self.loop = asyncio.get_running_loop()
 
-    def send_message(self, ds_channel_id, message, files=None):
-        asyncio.run_coroutine_threadsafe(self.my_async_func(ds_channel_id, message, files), self.loop)
+    def send_message(self, ds_channel_id, message):
+        asyncio.run_coroutine_threadsafe(self.my_async_func(ds_channel_id, message), self.loop)
 
     def send_document(self, ds_channel_id, message, file):
         print("ha")
@@ -40,7 +40,7 @@ class MyDiscordClient(discord.Client):
             await ds_channel.send(message, files=ds_files)
             for item in files:
                 item.close()
-                # await try_delete_file(item.name)
+                await try_delete_file(item.name)
         else:
             await ds_channel.send(message)
 
@@ -92,7 +92,7 @@ def main():
                             text = f"*{message.author.display_name}*\n{message.content}"
 
                             # Экранируем сообщения
-                            escape_characters = "#!()=.->+[]"
+                            escape_characters = "#!()=.>-+[]_"
                             for item in escape_characters:
                                 text = text.replace(f"{item}", f"\{item}")
 
@@ -155,8 +155,22 @@ def main():
             tg_bot = telebot.TeleBot(tg_token)
 
             @tg_bot.message_handler(content_types=["new_chat_members"])
-            def foo(message):
-                tg_bot.reply_to(message, "welcome text placeholder")
+            def welcome(message):
+                if message.chat.id == tg_chat_id:
+                    try:
+                        for new_chat_member in message.new_chat_members:
+                            username = new_chat_member.username
+                            username = username if username else new_chat_member.full_name
+                            username = f'<a href="tg://user?id={new_chat_member.id}">{username}</a>'
+                            text = open("tg_welcome_text.html", "r", encoding="UTF-8").read().replace("{@nickname}", username)
+                            tg_bot.reply_to(message, text, parse_mode="HTML")
+                    except Exception as e:
+                        errortext = f"Произошла ошибка при приветствии на строке {e.__traceback__.tb_lineno}:"
+                        errortext += f"\n{str(e)}\n"
+                        errdate = errdate = datetime.fromtimestamp(message.date).astimezone().isoformat()
+                        errortext += f"ID Сообщения: {message.id} от {errdate}"
+                        ds_bot.send_message(ds_admin_chat_id, errortext, disable_web_page_preview=False)
+                        raise e
 
             # Баг, через некоторое время перестаёт получать сообщения
             @tg_bot.message_handler(content_types=tg_content_types)
@@ -190,8 +204,8 @@ def main():
                             localfile.close()
                             localfile = open(file_info.file_path, "rb")
                             # Баг, поток не блокируется, он начинает загружать вложение и сразу пытается удалить файл
-                            ds_bot.send_message(ds_channel_id, text, [localfile])
-                            asyncio.run(try_delete_file(file_info.file_path))
+                            ds_bot.send_document(ds_channel_id, text, localfile)
+                            # asyncio.run(try_delete_file(file_info.file_path))
                         else:
                             errortext = f"Тип данных {message.content_type} не учтён"
                             ds_bot.send_message(ds_admin_chat_id, errortext)
