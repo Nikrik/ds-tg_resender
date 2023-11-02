@@ -216,10 +216,10 @@ def main():
                         errortext += f"ID Сообщения: {message.id} от {errdate}\n fileID={fileID}"
                         ds_bot.send_message(ds_admin_chat_id, errortext)
                         raise e
-            tg_restart_thread = Thread(target=restart_tg)
-            tg_restart_thread.start()
-            tg_bot.polling()
-            tg_restart_thread.join()
+            # tg_restart_thread = Thread(target=restart_tg)
+            # tg_restart_thread.start()
+            tg_bot.polling(non_stop=True, interval=1)
+            # tg_restart_thread.join()
             print("Телеграм завершает свою работу")
 
     ds_thread = Thread(target=run_ds)
