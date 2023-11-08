@@ -28,11 +28,10 @@ async def try_delete_file(filename):
 
 class MyTelegramClient(telebot.TeleBot):
     # Переопределяем класс, что бы починить его отрубание
-    def __init__(self, token: str, welcome_event_handler=None, message_event_handler=None, parse_mode: str | None = None, threaded: bool | None = True, skip_pending: bool | None = False, num_threads: int | None = 2, next_step_backend: HandlerBackend | None = None, reply_backend: HandlerBackend | None = None, exception_handler: ExceptionHandler | None = None, last_update_id: int | None = 0, suppress_middleware_excepions: bool | None = False, state_storage: StateStorageBase | None = ..., use_class_middlewares: bool | None = False, disable_web_page_preview: bool | None = None, disable_notification: bool | None = None, protect_content: bool | None = None, allow_sending_without_reply: bool | None = None, colorful_logs: bool | None = False):
+    def __init__(self, token: str, welcome_event_handler=None, message_event_handler=None):
         self.__is_polling = False
         # self.set_messa
-        super().__init__(token, parse_mode, threaded, skip_pending, num_threads, next_step_backend, reply_backend, exception_handler, last_update_id, suppress_middleware_excepions,
-                         state_storage, use_class_middlewares, disable_web_page_preview, disable_notification, protect_content, allow_sending_without_reply, colorful_logs)
+        super().__init__(token)
         self.message_event_handler = message_event_handler
         self.welcome_event_handler = welcome_event_handler
 
