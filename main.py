@@ -7,10 +7,8 @@ import os
 from datetime import datetime
 import time
 from telebot.types import Message
-from telebot import ExceptionHandler
-from telebot.handler_backends import HandlerBackend
-from telebot.storage import StateStorageBase
 import http.client
+import pickle
 
 
 async def try_delete_file(filename):
@@ -42,7 +40,8 @@ class MyTelegramClient(telebot.TeleBot):
         self.welcome_event_handler = function
 
     def __poll(self):
-        connection = http.client.HTTPSConnection("api.telegram.org")
+        timeout = 60
+        connection = http.client.HTTPSConnection("api.telegram.org", timeout=timeout+10)
         offset = None
         # Пропустить сообщения, которые бот получит, когда был неактивным
         if False:
@@ -51,9 +50,13 @@ class MyTelegramClient(telebot.TeleBot):
             response = json.loads(connection.getresponse().read().decode("utf-8"))
 
         while self.__is_polling:
-            url = f"/bot{self.token}/getUpdates?timeout=5{f'&offset={offset}' if offset else ''}"
+            url = f"/bot{self.token}/getUpdates?timeout={timeout}{f'&offset={offset}' if offset else ''}"
+            connection.close()
             connection.request("GET", url)
-            response = json.loads(connection.getresponse().read().decode("utf-8"))
+            try:
+                response = json.loads(connection.getresponse().read().decode("utf-8"))
+            except TimeoutError as e:
+                response = {"ok": False, "error": f"{e}"}
             if response['ok'] == True:
                 result = response['result']
                 if result:
@@ -62,10 +65,11 @@ class MyTelegramClient(telebot.TeleBot):
                         if 'message' in item.keys():
                             message_object = Message.de_json(item['message'])
                             if message_object:
-                                if self.message_event_handler != None:
-                                    if message_object.content_type == "new_chat_members":
+                                if message_object.content_type == "new_chat_members":
+                                    if self.welcome_event_handler != None:
                                         self.welcome_event_handler(message_object)
-                                    else:
+                                else:
+                                    if self.message_event_handler != None:
                                         self.message_event_handler(message_object)
                         else:
                             text = f"Тип {item.keys()} не учтён"
@@ -73,9 +77,10 @@ class MyTelegramClient(telebot.TeleBot):
                             report_bug(text)
                 else:
                     offset = None
-                time.sleep(1)
             else:
+                offset = None
                 report_bug(f"not ok {response}")
+            time.sleep(1)
 
     def start(self):
         if self.__is_polling == False:
@@ -126,6 +131,14 @@ with open('settings.json') as f:
 
 def report_bug(message):
     ds_bot.send_message(ds_admin_chat_id, message)
+
+
+def report_bug_and_dump_variable(message, variable):
+    filename = f"{time.time()}.bin"
+    with open(filename, "wb") as f:
+        pickle.dump(variable, f)
+    with open(filename, "rb") as f:
+        ds_bot.send_document(ds_channel_id, message, f)
 
 
 def main():
@@ -250,6 +263,8 @@ def main():
                         if message.content_type in ["text"]:
                             username = message.from_user.username
                             username = username if username else message.from_user.full_name
+                            if username == None:
+                                report_bug_and_dump_variable("Неправильный юзернейм", message)
                             text = f'**{username}**\n{message.text}'
                             ds_bot.send_message(ds_channel_id, text)
                         elif message.content_type in ["photo", "document", "sticker"]:
