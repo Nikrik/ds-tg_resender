@@ -57,6 +57,9 @@ class MyTelegramClient(telebot.TeleBot):
                 response = json.loads(connection.getresponse().read().decode("utf-8"))
             except TimeoutError as e:
                 response = {"ok": False, "error": f"{e}"}
+            except Exception as e:
+                report_bug(f"Исключение TimeoutError не было поймано, но было поймано {e}")
+                response = {"ok": False, "error": f"{e}"}
             if response['ok'] == True:
                 result = response['result']
                 if result:
@@ -311,8 +314,9 @@ def main():
     tg_thread = Thread(target=run_tg)
     ds_thread.start()
     tg_thread.start()
-    ds_thread.join()
     tg_thread.join()
+    report_bug("Поток телеграма завершился")
+    ds_thread.join()
     print("Остановка главного потока")
 
 
