@@ -40,7 +40,7 @@ class MyTelegramClient(telebot.TeleBot):
         self.welcome_event_handler = function
 
     def __poll(self):
-        timeout = 60
+        timeout = 15
         connection = http.client.HTTPSConnection("api.telegram.org", timeout=timeout+10)
         offset = None
         # Пропустить сообщения, которые бот получит, когда был неактивным
@@ -137,11 +137,18 @@ def report_bug(message):
 
 
 def report_bug_and_dump_variable(message, variable):
-    filename = f"{time.time()}.bin"
-    with open(filename, "wb") as f:
-        pickle.dump(variable, f)
-    with open(filename, "rb") as f:
-        ds_bot.send_document(ds_channel_id, message, f)
+    try:
+        file_is_exists = True
+        while file_is_exists:
+            filename = f"{int(time.time())}.bin"
+            time.sleep(1)
+            file_is_exists = os.path.exists(filename)
+        with open(filename, "wb") as f:
+            pickle.dump(variable, f)
+        with open(filename, "rb") as f:
+            ds_bot.send_document(ds_channel_id, message, f)
+    except Exception as e:
+        report_bug(f"Не удалось создать дамп памяти: {e}")
 
 
 def main():
@@ -173,8 +180,10 @@ def main():
 
             @ds_bot.event
             async def on_message(message):
-                if message.author.id != ds_bot.user.id:
-                    if message.channel.id == ds_channel_id:
+                if message.author.id != ds_bot.user.id and not message.author.bot:
+                    global send_from_ds_to_tg
+                    global send_from_tg_to_ds
+                    if message.channel.id == ds_channel_id and send_from_ds_to_tg:
                         try:
                             text = f"*{message.author.display_name}*\n{message.content}"
 
@@ -216,9 +225,19 @@ def main():
                             await ds_bot.close()
                         elif message.content == "restart DS":
                             await ds_bot.close()
+                        elif message.content == "restart TG":
+                            tg_bot.stop()
+                        elif message.content == "send_from_ds_to_tg":
+                            send_from_ds_to_tg = not send_from_ds_to_tg
+                            text = f"Новое значение send_from_ds_to_tg: {send_from_ds_to_tg}"
+                            ds_bot.send_message(message.channel.id, text)
+                        elif message.content == "send_from_tg_to_ds":
+                            send_from_tg_to_ds = not send_from_tg_to_ds
+                            text = f"Новое значение send_from_tg_to_ds: {send_from_tg_to_ds}"
+                            ds_bot.send_message(message.channel.id, text)
                         else:
-                            text = "Неизвестная команда\nДоступные команды: kill, restart, restart DS"
-                            report_bug(text)
+                            text = "Неизвестная команда\nДоступные команды: kill, restart, restart DS, restart TG, send_from_ds_to_tg, send_from_tg_to_ds"
+                            ds_bot.send_message(message.channel.id, text)
             ds_bot.run(ds_token)
             ds_bot.clear()
             print("Дискорд завершает свою работу")
@@ -261,7 +280,7 @@ def main():
             def get_message(message):
                 fileID = None
                 # ds_bot.send_message(ds_admin_chat_id, f"Сообщение из ID чата {message.chat.id},\n содержание\n{message.text}")
-                if message.chat.id == tg_chat_id:
+                if message.chat.id == tg_chat_id and send_from_tg_to_ds:
                     try:
                         if message.content_type in ["text"]:
                             username = message.from_user.username
@@ -279,7 +298,7 @@ def main():
                             elif message.content_type == "sticker":
                                 fileID = message.sticker.thumbnail.file_id
                             else:
-                                raise Exception(f"В программу не добавился тип документов: {message.content_type}")
+                                report_bug(f"В программу не добавился тип: {message.content_type}")
                             file_info = tg_bot.get_file(fileID)
                             downloaded_bytes = tg_bot.download_file(file_info.file_path)
                             directory = os.path.dirname(file_info.file_path)
@@ -322,6 +341,8 @@ def main():
 
 is_restarted = True
 is_killed = False
+send_from_ds_to_tg = True
+send_from_tg_to_ds = True
 if __name__ == "__main__":
     while is_restarted and not is_killed:
         is_restarted = False
