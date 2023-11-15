@@ -52,8 +52,8 @@ class MyTelegramClient(telebot.TeleBot):
         while self.__is_polling:
             url = f"/bot{self.token}/getUpdates?timeout={timeout}{f'&offset={offset}' if offset else ''}"
             connection.close()
-            connection.request("GET", url)
             try:
+                connection.request("GET", url)
                 response = json.loads(connection.getresponse().read().decode("utf-8"))
             except TimeoutError as e:
                 response = {"ok": False, "error": f"{e}"}
